@@ -17,16 +17,16 @@ if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 let posts = [];
 let chats = {};
 
-/* FILE UPLOAD */
-const storage = multer.diskStorage({
-  destination: "uploads",
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  }
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "uploads",
+    filename: (req, file, cb) => {
+      cb(null, Date.now() + "-" + file.originalname);
+    }
+  })
 });
-const upload = multer({ storage });
 
-/* ---------------- POSTS ---------------- */
+/* ================= POSTS ================= */
 app.get("/posts", (req, res) => {
   res.json(posts);
 });
@@ -35,15 +35,14 @@ app.post("/post", upload.single("image"), (req, res) => {
   const post = {
     id: Date.now(),
     text: req.body.text,
-    image: req.file ? "/uploads/" + req.file.filename : null,
-    time: Date.now()
+    image: req.file ? "/uploads/" + req.file.filename : null
   };
 
   posts.unshift(post);
-  res.json(post);
+  res.json({ success: true, post });
 });
 
-/* ---------------- CHAT ---------------- */
+/* ================= CHAT ================= */
 io.on("connection", (socket) => {
   socket.on("join", (room) => {
     socket.join(room);
@@ -53,13 +52,13 @@ io.on("connection", (socket) => {
   });
 
   socket.on("msg", ({ room, msg }) => {
-    const data = { msg, time: Date.now() };
-
     if (!chats[room]) chats[room] = [];
+
+    const data = { msg };
     chats[room].push(data);
 
     io.to(room).emit("new", data);
   });
 });
 
-server.listen(3000, () => console.log("AfricaUni running on port 3000"));
+server.listen(3000, () => console.log("AfricaUni running"));
