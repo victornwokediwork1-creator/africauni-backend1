@@ -2,38 +2,90 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AfricaUni</title>
+
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <style>
 body{margin:0;font-family:Arial;background:#eef2f5}
+
 .page{display:none;padding:20px}
 .page.active{display:block}
-#welcome{height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#1e90ff;color:white}
-button{padding:10px;margin:5px;border:none;border-radius:8px;background:#1e90ff;color:white}
-input,textarea{width:100%;padding:10px;margin:5px 0}
-.card{background:white;padding:10px;margin:10px 0;border-radius:10px}
-.nav{display:flex;justify-content:space-around;background:#1e90ff}
-.nav button{background:white;color:#1e90ff}
+
+#welcome{
+height:100vh;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#1e90ff,#00c6ff);
+color:white;
+text-align:center;
+}
+
+button{
+padding:10px;
+margin:5px;
+border:none;
+border-radius:8px;
+background:#1e90ff;
+color:white;
+}
+
+input,textarea{
+width:100%;
+padding:10px;
+margin:5px 0;
+}
+
+.card{
+background:white;
+padding:10px;
+margin:10px 0;
+border-radius:10px;
+}
+
+.nav{
+display:flex;
+justify-content:space-around;
+background:#1e90ff;
+}
+
+.nav button{
+background:white;
+color:#1e90ff;
+font-weight:bold;
+}
+
 .section{display:none}
 .section.active{display:block}
-video{width:100%;border-radius:10px}
+
+video{
+width:100%;
+border-radius:10px;
+background:black;
+}
 </style>
 </head>
 
 <body>
 
+<!-- WELCOME -->
 <div id="welcome" class="page active">
-<h2>AfricaUni</h2>
-<button onclick="goLogin()">Start</button>
+<h1>AfricaUni</h1>
+<p>Connect • Learn • Share</p>
+<button onclick="goLogin()">Next ➜</button>
 </div>
 
+<!-- LOGIN -->
 <div id="login" class="page">
-<input id="username" placeholder="Username">
+<h2>Login</h2>
+<input id="username" placeholder="Enter username">
 <button onclick="login()">Enter</button>
 </div>
 
+<!-- DASHBOARD -->
 <div id="dashboard" class="page">
 
 <div class="nav">
@@ -42,56 +94,106 @@ video{width:100%;border-radius:10px}
 <button onclick="show('meet')">Meet</button>
 </div>
 
+<!-- POSTS -->
 <div id="posts" class="section active">
+<h2>🔥 Feed</h2>
+
 <textarea id="postText"></textarea>
 <input type="file" id="imageInput">
 <button onclick="addPost()">Post</button>
+
 <div id="feed"></div>
 </div>
 
+<!-- CHAT -->
 <div id="chat" class="section">
+<h2>💬 Chat</h2>
+
 <div id="chatBox"></div>
+
 <input id="msg">
 <button onclick="send()">Send</button>
 </div>
 
+<!-- MEET -->
 <div id="meet" class="section">
+<h2>🎥 Meet (Omegle Style)</h2>
+
 <button onclick="findMatch()">Find Match</button>
-<p id="status"></p>
-<video id="cam" autoplay muted></video>
+<button onclick="startCamera()">Start Camera</button>
+<button onclick="disconnect()">Disconnect</button>
+
+<p id="status">Not connected</p>
+
+<video id="cam" autoplay muted playsinline></video>
 </div>
 
 </div>
 
 <script>
 
-const API="https://africauni-backend1-1.onrender.com";
-let socket=io(API);
-let username="";
+const API = "https://africauni-backend1-1.onrender.com";
+let socket = io(API);
+let username = "";
 
-/* NAV */
-function goLogin(){switchPage("login")}
-function switchPage(p){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(p).classList.add("active")}
-function show(s){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));document.getElementById(s).classList.add("active")}
+/* NAVIGATION */
+function goLogin(){
+switchPage("login");
+}
+
+function switchPage(p){
+document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+document.getElementById(p).classList.add("active");
+}
+
+function show(s){
+document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+document.getElementById(s).classList.add("active");
+}
 
 /* LOGIN */
 function login(){
-username=document.getElementById("username").value;
+username = document.getElementById("username").value;
+if(!username) return alert("Enter username");
+
+socket.emit("joinUser", username);
+
 switchPage("dashboard");
 }
 
 /* POSTS */
 function addPost(){
-const text=document.getElementById("postText").value;
-const img=document.getElementById("imageInput").files[0];
+const text = document.getElementById("postText").value;
+const img = document.getElementById("imageInput").files[0];
 
-const form=new FormData();
-form.append("username",username);
-form.append("text",text);
-if(img)form.append("image",img);
+const form = new FormData();
+form.append("username", username);
+form.append("text", text);
+if(img) form.append("image", img);
 
-fetch(API+"/post",{method:"POST",body:form});
+fetch(API+"/post",{
+method:"POST",
+body:form
+});
 }
+
+/* LIVE POSTS */
+socket.on("newPost", post => {
+
+const div = document.createElement("div");
+div.className="card";
+
+let html = `<b>${post.username}</b><br>${post.text}`;
+
+if(post.image){
+html += `<br><img src="${API+post.image}" style="width:100%">`;
+}
+
+div.innerHTML = html;
+
+document.getElementById("feed").prepend(div);
+
+});
 
 /* CHAT */
 socket.emit("joinChat","room1");
@@ -104,18 +206,48 @@ document.getElementById("chatBox").appendChild(div);
 });
 
 function send(){
-socket.emit("sendMessage",{roomId:"room1",user:username,message:msg.value});
+socket.emit("sendMessage",{
+roomId:"room1",
+user:username,
+message:msg.value
+});
 msg.value="";
 }
 
 /* MEET */
-function findMatch(){socket.emit("findMatch")}
-socket.on("status",m=>status.innerText=m);
-socket.on("matched",()=>status.innerText="Connected");
+function findMatch(){
+socket.emit("findMatch");
+}
+
+socket.on("status",m=>{
+status.innerText=m;
+});
+
+socket.on("matched",()=>{
+status.innerText="Connected 🎉";
+});
 
 /* CAMERA */
-navigator.mediaDevices.getUserMedia({video:true,audio:true})
-.then(s=>cam.srcObject=s);
+async function startCamera(){
+try{
+const stream = await navigator.mediaDevices.getUserMedia({
+video:true,
+audio:true
+});
+
+cam.srcObject = stream;
+
+}catch(e){
+alert("Camera blocked");
+}
+}
+
+/* DISCONNECT */
+function disconnect(){
+socket.disconnect();
+socket = io(API);
+status.innerText="Disconnected";
+}
 
 </script>
 
