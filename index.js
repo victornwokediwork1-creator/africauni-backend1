@@ -17,43 +17,47 @@ const io = new Server(server, {
 });
 
 /* =========================
-   DATABASE (TEMP MEMORY)
+   MEMORY DATABASE
 ========================= */
 
 let users = {};
 let posts = [];
+
 let waitingUser = null;
-let activePairs = {};
 
 /* =========================
-   IMAGE UPLOAD
+   IMAGE UPLOAD CONFIG
 ========================= */
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, "uploads/"),
-    filename: (req, file, cb) =>
-        cb(null, Date.now() + path.extname(file.originalname))
+    destination: (req, file, cb) => {
+        cb(null, "uploads/");
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
 });
 
 const upload = multer({ storage });
 
 /* =========================
-   BASIC ROUTES
+   BASIC ROUTE
 ========================= */
 
 app.get("/", (req, res) => {
-    res.json({ status: "AfricaUni running 🚀" });
+    res.json({ message: "AfricaUni Backend Running 🚀" });
 });
 
 /* =========================
-   LOGIN / USER CREATION
+   LOGIN / PROFILE CREATE
 ========================= */
 
 app.post("/login", (req, res) => {
     const { username } = req.body;
 
-    if (!username)
+    if (!username) {
         return res.status(400).json({ error: "Username required" });
+    }
 
     if (!users[username]) {
         users[username] = {
@@ -67,33 +71,23 @@ app.post("/login", (req, res) => {
 });
 
 /* =========================
-   PROFILE
-========================= */
-
-app.get("/profile/:username", (req, res) => {
-    const user = users[req.params.username];
-
-    if (!user)
-        return res.status(404).json({ error: "User not found" });
-
-    res.json(user);
-});
-
-/* =========================
    FOLLOW SYSTEM
 ========================= */
 
 app.post("/follow", (req, res) => {
     const { user, target } = req.body;
 
-    if (!users[user] || !users[target])
+    if (!users[user] || !users[target]) {
         return res.status(404).json({ error: "User not found" });
+    }
 
-    if (!users[user].following.includes(target))
+    if (!users[user].following.includes(target)) {
         users[user].following.push(target);
+    }
 
-    if (!users[target].followers.includes(user))
+    if (!users[target].followers.includes(user)) {
         users[target].followers.push(user);
+    }
 
     res.json({ success: true });
 });
@@ -101,17 +95,27 @@ app.post("/follow", (req, res) => {
 app.post("/unfollow", (req, res) => {
     const { user, target } = req.body;
 
-    if (users[user]) {
-        users[user].following =
-            users[user].following.filter(u => u !== target);
-    }
+    users[user].following =
+        users[user].following.filter(u => u !== target);
 
-    if (users[target]) {
-        users[target].followers =
-            users[target].followers.filter(u => u !== user);
-    }
+    users[target].followers =
+        users[target].followers.filter(u => u !== user);
 
     res.json({ success: true });
+});
+
+/* =========================
+   GET PROFILE
+========================= */
+
+app.get("/profile/:username", (req, res) => {
+    const user = users[req.params.username];
+
+    if (!user) {
+        return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(user);
 });
 
 /* =========================
@@ -119,6 +123,7 @@ app.post("/unfollow", (req, res) => {
 ========================= */
 
 app.post("/post", upload.single("image"), (req, res) => {
+
     const { username, text } = req.body;
 
     let image = null;
@@ -135,12 +140,13 @@ app.post("/post", upload.single("image"), (req, res) => {
 
     posts.unshift(post);
 
-    // 🔥 REAL TIME BROADCAST TO ALL USERS
+    // 🔥 SEND TO ALL USERS LIVE
     io.emit("newPost", post);
 
     res.json(post);
 });
 
+/* GET ALL POSTS */
 app.get("/posts", (req, res) => {
     res.json(posts);
 });
@@ -155,12 +161,13 @@ io.on("connection", (socket) => {
 
     /* JOIN USER */
     socket.on("joinUser", (username) => {
+        socket.username = username;
         socket.join(username);
     });
 
     /* GROUP CHAT */
-    socket.on("joinChat", (room) => {
-        socket.join(room);
+    socket.on("joinChat", (roomId) => {
+        socket.join(roomId);
     });
 
     socket.on("sendMessage", ({ roomId, user, message }) => {
@@ -169,6 +176,7 @@ io.on("connection", (socket) => {
 
     /* PRIVATE CHAT */
     socket.on("privateMessage", ({ from, to, message }) => {
+
         io.to(to).emit("newMessage", {
             user: from,
             message
@@ -190,29 +198,16 @@ io.on("connection", (socket) => {
             const partner = waitingUser;
             waitingUser = null;
 
-            activePairs[socket.id] = partner.id;
-            activePairs[partner.id] = socket.id;
-
             socket.emit("matched");
             partner.emit("matched");
         }
     });
 
-    /* DISCONNECT */
     socket.on("disconnect", () => {
 
         if (waitingUser?.id === socket.id) {
             waitingUser = null;
         }
-
-        const partnerId = activePairs[socket.id];
-
-        if (partnerId) {
-            io.to(partnerId).emit("partnerLeft");
-            delete activePairs[partnerId];
-        }
-
-        delete activePairs[socket.id];
 
         console.log("User disconnected:", socket.id);
     });
