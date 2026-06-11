@@ -238,4 +238,208 @@ async function startCamera(){
 </script>
 
 </body>
+</html>}
+
+input,textarea{
+    width:100%;
+    padding:10px;
+    margin:5px 0;
+}
+
+.nav{
+    display:flex;
+    justify-content:space-around;
+    background:#1e90ff;
+}
+
+.nav button{
+    background:white;
+    color:#1e90ff;
+    font-weight:bold;
+}
+
+.section{display:none;padding:10px;}
+.section.active{display:block;}
+
+.card{
+    background:white;
+    padding:10px;
+    margin:10px 0;
+    border-radius:10px;
+}
+
+video{
+    width:100%;
+    border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- WELCOME -->
+<div id="welcome" class="page active">
+    <h1>AfricaUni</h1>
+    <p>Connect • Learn • Share</p>
+    <button onclick="goLogin()">Next</button>
+</div>
+
+<!-- LOGIN -->
+<div id="login" class="page">
+    <h2>Login</h2>
+    <input id="username" placeholder="Enter username">
+    <button onclick="login()">Enter</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="page">
+
+    <div class="nav">
+        <button onclick="showSection('posts')">Posts</button>
+        <button onclick="showSection('messages')">Chat</button>
+        <button onclick="showSection('meet')">Meet</button>
+        <button onclick="showSection('rules')">Rules</button>
+    </div>
+
+    <!-- POSTS -->
+    <div id="posts" class="section active">
+        <h2>🔥 Feed</h2>
+
+        <textarea id="postText"></textarea>
+        <input type="file" id="imageInput" accept="image/*">
+        <button onclick="addPost()">Post</button>
+
+        <div id="feed"></div>
+    </div>
+
+    <!-- CHAT -->
+    <div id="messages" class="section">
+        <h2>💬 Chat</h2>
+
+        <div id="chatBox"></div>
+
+        <input id="msgInput" placeholder="Message">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <!-- MEET -->
+    <div id="meet" class="section">
+        <h2>🎥 Meet</h2>
+
+        <button onclick="findMatch()">Find Match</button>
+        <button onclick="startCamera()">Start Camera</button>
+
+        <p id="status">Not connected</p>
+
+        <video id="myVideo" autoplay muted playsinline></video>
+    </div>
+
+    <!-- RULES -->
+    <div id="rules" class="section">
+        <h2>📜 Rules</h2>
+        <p>No abuse, no nudity, respect students.</p>
+    </div>
+
+</div>
+
+<script>
+
+const API = "https://africauni-backend1-1.onrender.com";
+
+let username = "";
+let socket = io(API);
+
+/* NAVIGATION */
+function goLogin(){
+    switchPage("login");
+}
+
+function login(){
+    username = document.getElementById("username").value;
+    if(!username) return alert("Enter username");
+    switchPage("dashboard");
+}
+
+function switchPage(page){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById(page).classList.add("active");
+}
+
+function showSection(section){
+    document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+    document.getElementById(section).classList.add("active");
+}
+
+/* POSTS */
+function addPost(){
+    const text = document.getElementById("postText").value;
+    const image = document.getElementById("imageInput").files[0];
+
+    const div = document.createElement("div");
+    div.className = "card";
+
+    if(image){
+        div.innerHTML =
+        "<b>"+username+"</b><br>"+text+
+        "<br><img src='"+URL.createObjectURL(image)+"' style='width:100%'>";
+    }else{
+        div.innerHTML = "<b>"+username+"</b><br>"+text;
+    }
+
+    document.getElementById("feed").prepend(div);
+}
+
+/* CHAT */
+socket.emit("joinChat","africauni-room");
+
+socket.on("newMessage",(data)=>{
+    const div = document.createElement("div");
+    div.className="card";
+    div.innerHTML="<b>"+data.user+":</b> "+data.message;
+    document.getElementById("chatBox").appendChild(div);
+});
+
+function sendMessage(){
+    const msg = document.getElementById("msgInput").value;
+
+    socket.emit("sendMessage",{
+        roomId:"africauni-room",
+        user:username,
+        message:msg
+    });
+
+    document.getElementById("msgInput").value="";
+}
+
+/* MEET */
+function findMatch(){
+    socket.emit("findMatch");
+}
+
+socket.on("status",(m)=>{
+    document.getElementById("status").innerText=m;
+});
+
+socket.on("matched",()=>{
+    document.getElementById("status").innerText="Connected 🎉";
+});
+
+/* CAMERA */
+async function startCamera(){
+    try{
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video:true,
+            audio:true
+        });
+
+        document.getElementById("myVideo").srcObject = stream;
+
+    }catch(e){
+        alert("Camera not allowed");
+    }
+}
+
+</script>
+
+</body>
 </html>
