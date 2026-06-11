@@ -111,7 +111,7 @@ background:black;
 
 <div id="chatBox"></div>
 
-<input id="msg">
+<input id="msgInput" placeholder="Message">
 <button onclick="send()">Send</button>
 </div>
 
@@ -136,7 +136,7 @@ const API = "https://africauni-backend1-1.onrender.com";
 let socket = io(API);
 let username = "";
 
-/* NAVIGATION */
+/* NAV */
 function goLogin(){
 switchPage("login");
 }
@@ -161,24 +161,30 @@ socket.emit("joinUser", username);
 switchPage("dashboard");
 }
 
-/* POSTS */
+/* POSTS (FIXED) */
 function addPost(){
+
 const text = document.getElementById("postText").value;
-const img = document.getElementById("imageInput").files[0];
+const image = document.getElementById("imageInput").files[0];
+
+if(!text && !image) return alert("Write something");
 
 const form = new FormData();
 form.append("username", username);
 form.append("text", text);
-if(img) form.append("image", img);
+if(image) form.append("image", image);
 
-fetch(API+"/post",{
+fetch(API+"/post", {
 method:"POST",
 body:form
+}).then(()=>{
+document.getElementById("postText").value = "";
+document.getElementById("imageInput").value = "";
 });
 }
 
 /* LIVE POSTS */
-socket.on("newPost", post => {
+socket.on("newPost", post=>{
 
 const div = document.createElement("div");
 div.className="card";
@@ -194,23 +200,27 @@ document.getElementById("feed").prepend(div);
 
 });
 
-/* CHAT */
+/* CHAT (FIXED) */
 socket.emit("joinChat","room1");
 
 socket.on("newMessage",d=>{
-let div=document.createElement("div");
+const div=document.createElement("div");
 div.className="card";
-div.innerHTML="<b>"+d.user+"</b>: "+d.message;
+div.innerHTML=`<b>${d.user}</b>: ${d.message}`;
 document.getElementById("chatBox").appendChild(div);
 });
 
 function send(){
+const msg = document.getElementById("msgInput").value;
+if(!msg) return;
+
 socket.emit("sendMessage",{
 roomId:"room1",
 user:username,
-message:msg.value
+message:msg
 });
-msg.value="";
+
+document.getElementById("msgInput").value = "";
 }
 
 /* MEET */
@@ -219,33 +229,42 @@ socket.emit("findMatch");
 }
 
 socket.on("status",m=>{
-status.innerText=m;
+document.getElementById("status").innerText = m;
 });
 
 socket.on("matched",()=>{
-status.innerText="Connected 🎉";
+document.getElementById("status").innerText = "Connected 🎉";
 });
 
-/* CAMERA */
+/* CAMERA (FIXED STOP ISSUE) */
+let streamGlobal;
+
 async function startCamera(){
 try{
-const stream = await navigator.mediaDevices.getUserMedia({
+streamGlobal = await navigator.mediaDevices.getUserMedia({
 video:true,
 audio:true
 });
 
-cam.srcObject = stream;
+cam.srcObject = streamGlobal;
 
 }catch(e){
-alert("Camera blocked or not allowed");
+alert("Camera blocked");
 }
 }
 
-/* DISCONNECT */
+/* DISCONNECT (FIXED PROPERLY) */
 function disconnect(){
+
+if(streamGlobal){
+streamGlobal.getTracks().forEach(track=>track.stop());
+cam.srcObject = null;
+}
+
 socket.disconnect();
 socket = io(API);
-status.innerText="Disconnected";
+
+document.getElementById("status").innerText = "Disconnected";
 }
 
 </script>
