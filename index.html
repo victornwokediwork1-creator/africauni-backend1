@@ -75,7 +75,7 @@ background:black;
 <div id="welcome" class="page active">
 <h1>AfricaUni</h1>
 <p>Connect • Learn • Share</p>
-<button onclick="goLogin()">Next ➜</button>
+<button onclick="goLogin()">Next</button>
 </div>
 
 <!-- LOGIN -->
@@ -117,7 +117,7 @@ background:black;
 
 <!-- MEET -->
 <div id="meet" class="section">
-<h2>🎥 Meet (Omegle Style)</h2>
+<h2>🎥 Meet</h2>
 
 <button onclick="findMatch()">Find Match</button>
 <button onclick="startCamera()">Start Camera</button>
@@ -190,7 +190,6 @@ html += `<br><img src="${API+post.image}" style="width:100%">`;
 }
 
 div.innerHTML = html;
-
 document.getElementById("feed").prepend(div);
 
 });
@@ -238,7 +237,7 @@ audio:true
 cam.srcObject = stream;
 
 }catch(e){
-alert("Camera blocked");
+alert("Camera blocked or not allowed");
 }
 }
 
