@@ -1,443 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AfricaUni</title>
-
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <style>
-body{
-    margin:0;
-    font-family:Arial;
-    background:#eef2f5;
-}
-
-.page{display:none;padding:20px;}
-.page.active{display:block;}
-
-#welcome{
-    height:100vh;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    background:linear-gradient(135deg,#1e90ff,#00c6ff);
-    color:white;
-}
-
-button{
-    padding:10px;
-    margin:5px;
-    border:none;
-    border-radius:8px;
-    background:#1e90ff;
-    color:white;
-}
-
-input,textarea{
-    width:100%;
-    padding:10px;
-    margin:5px 0;
-}
-
-.nav{
-    display:flex;
-    justify-content:space-around;
-    background:#1e90ff;
-}
-
-.nav button{
-    background:white;
-    color:#1e90ff;
-    font-weight:bold;
-}
-
-.section{display:none;padding:10px;}
-.section.active{display:block;}
-
-.card{
-    background:white;
-    padding:10px;
-    margin:10px 0;
-    border-radius:10px;
-}
-
-video{
-    width:100%;
-    border-radius:10px;
-}
+body{margin:0;font-family:Arial;background:#eef2f5}
+.page{display:none;padding:20px}
+.page.active{display:block}
+#welcome{height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#1e90ff;color:white}
+button{padding:10px;margin:5px;border:none;border-radius:8px;background:#1e90ff;color:white}
+input,textarea{width:100%;padding:10px;margin:5px 0}
+.card{background:white;padding:10px;margin:10px 0;border-radius:10px}
+.nav{display:flex;justify-content:space-around;background:#1e90ff}
+.nav button{background:white;color:#1e90ff}
+.section{display:none}
+.section.active{display:block}
+video{width:100%;border-radius:10px}
 </style>
 </head>
 
 <body>
 
-<!-- WELCOME -->
 <div id="welcome" class="page active">
-    <h1>AfricaUni</h1>
-    <p>Connect • Learn • Share</p>
-    <button onclick="goLogin()">Next</button>
+<h2>AfricaUni</h2>
+<button onclick="goLogin()">Start</button>
 </div>
 
-<!-- LOGIN -->
 <div id="login" class="page">
-    <h2>Login</h2>
-    <input id="username" placeholder="Enter username">
-    <button onclick="login()">Enter</button>
+<input id="username" placeholder="Username">
+<button onclick="login()">Enter</button>
 </div>
 
-<!-- DASHBOARD -->
 <div id="dashboard" class="page">
 
-    <div class="nav">
-        <button onclick="showSection('posts')">Posts</button>
-        <button onclick="showSection('messages')">Chat</button>
-        <button onclick="showSection('meet')">Meet</button>
-        <button onclick="showSection('rules')">Rules</button>
-    </div>
+<div class="nav">
+<button onclick="show('posts')">Posts</button>
+<button onclick="show('chat')">Chat</button>
+<button onclick="show('meet')">Meet</button>
+</div>
 
-    <!-- POSTS -->
-    <div id="posts" class="section active">
-        <h2>🔥 Feed</h2>
+<div id="posts" class="section active">
+<textarea id="postText"></textarea>
+<input type="file" id="imageInput">
+<button onclick="addPost()">Post</button>
+<div id="feed"></div>
+</div>
 
-        <textarea id="postText"></textarea>
-        <input type="file" id="imageInput" accept="image/*">
-        <button onclick="addPost()">Post</button>
+<div id="chat" class="section">
+<div id="chatBox"></div>
+<input id="msg">
+<button onclick="send()">Send</button>
+</div>
 
-        <div id="feed"></div>
-    </div>
-
-    <!-- CHAT -->
-    <div id="messages" class="section">
-        <h2>💬 Chat</h2>
-
-        <div id="chatBox"></div>
-
-        <input id="msgInput" placeholder="Message">
-        <button onclick="sendMessage()">Send</button>
-    </div>
-
-    <!-- MEET -->
-    <div id="meet" class="section">
-        <h2>🎥 Meet</h2>
-
-        <button onclick="findMatch()">Find Match</button>
-        <button onclick="startCamera()">Start Camera</button>
-
-        <p id="status">Not connected</p>
-
-        <video id="myVideo" autoplay muted playsinline></video>
-    </div>
-
-    <!-- RULES -->
-    <div id="rules" class="section">
-        <h2>📜 Rules</h2>
-        <p>No abuse, no nudity, respect students.</p>
-    </div>
+<div id="meet" class="section">
+<button onclick="findMatch()">Find Match</button>
+<p id="status"></p>
+<video id="cam" autoplay muted></video>
+</div>
 
 </div>
 
 <script>
 
-const API = "https://africauni-backend1-1.onrender.com";
+const API="https://africauni-backend1-1.onrender.com";
+let socket=io(API);
+let username="";
 
-let username = "";
-let socket = io(API);
+/* NAV */
+function goLogin(){switchPage("login")}
+function switchPage(p){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(p).classList.add("active")}
+function show(s){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));document.getElementById(s).classList.add("active")}
 
-/* NAVIGATION */
-function goLogin(){
-    switchPage("login");
-}
-
+/* LOGIN */
 function login(){
-    username = document.getElementById("username").value;
-    if(!username) return alert("Enter username");
-    switchPage("dashboard");
-}
-
-function switchPage(page){
-    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-    document.getElementById(page).classList.add("active");
-}
-
-function showSection(section){
-    document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-    document.getElementById(section).classList.add("active");
+username=document.getElementById("username").value;
+switchPage("dashboard");
 }
 
 /* POSTS */
 function addPost(){
-    const text = document.getElementById("postText").value;
-    const image = document.getElementById("imageInput").files[0];
+const text=document.getElementById("postText").value;
+const img=document.getElementById("imageInput").files[0];
 
-    const div = document.createElement("div");
-    div.className = "card";
+const form=new FormData();
+form.append("username",username);
+form.append("text",text);
+if(img)form.append("image",img);
 
-    if(image){
-        div.innerHTML =
-        "<b>"+username+"</b><br>"+text+
-        "<br><img src='"+URL.createObjectURL(image)+"' style='width:100%'>";
-    }else{
-        div.innerHTML = "<b>"+username+"</b><br>"+text;
-    }
-
-    document.getElementById("feed").prepend(div);
+fetch(API+"/post",{method:"POST",body:form});
 }
 
 /* CHAT */
-socket.emit("joinChat","africauni-room");
+socket.emit("joinChat","room1");
 
-socket.on("newMessage",(data)=>{
-    const div = document.createElement("div");
-    div.className="card";
-    div.innerHTML="<b>"+data.user+":</b> "+data.message;
-    document.getElementById("chatBox").appendChild(div);
+socket.on("newMessage",d=>{
+let div=document.createElement("div");
+div.className="card";
+div.innerHTML="<b>"+d.user+"</b>: "+d.message;
+document.getElementById("chatBox").appendChild(div);
 });
 
-function sendMessage(){
-    const msg = document.getElementById("msgInput").value;
-
-    socket.emit("sendMessage",{
-        roomId:"africauni-room",
-        user:username,
-        message:msg
-    });
-
-    document.getElementById("msgInput").value="";
+function send(){
+socket.emit("sendMessage",{roomId:"room1",user:username,message:msg.value});
+msg.value="";
 }
 
 /* MEET */
-function findMatch(){
-    socket.emit("findMatch");
-}
-
-socket.on("status",(m)=>{
-    document.getElementById("status").innerText=m;
-});
-
-socket.on("matched",()=>{
-    document.getElementById("status").innerText="Connected 🎉";
-});
+function findMatch(){socket.emit("findMatch")}
+socket.on("status",m=>status.innerText=m);
+socket.on("matched",()=>status.innerText="Connected");
 
 /* CAMERA */
-async function startCamera(){
-    try{
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video:true,
-            audio:true
-        });
-
-        document.getElementById("myVideo").srcObject = stream;
-
-    }catch(e){
-        alert("Camera not allowed");
-    }
-}
-
-</script>
-
-</body>
-</html>}
-
-input,textarea{
-    width:100%;
-    padding:10px;
-    margin:5px 0;
-}
-
-.nav{
-    display:flex;
-    justify-content:space-around;
-    background:#1e90ff;
-}
-
-.nav button{
-    background:white;
-    color:#1e90ff;
-    font-weight:bold;
-}
-
-.section{display:none;padding:10px;}
-.section.active{display:block;}
-
-.card{
-    background:white;
-    padding:10px;
-    margin:10px 0;
-    border-radius:10px;
-}
-
-video{
-    width:100%;
-    border-radius:10px;
-}
-</style>
-</head>
-
-<body>
-
-<!-- WELCOME -->
-<div id="welcome" class="page active">
-    <h1>AfricaUni</h1>
-    <p>Connect • Learn • Share</p>
-    <button onclick="goLogin()">Next</button>
-</div>
-
-<!-- LOGIN -->
-<div id="login" class="page">
-    <h2>Login</h2>
-    <input id="username" placeholder="Enter username">
-    <button onclick="login()">Enter</button>
-</div>
-
-<!-- DASHBOARD -->
-<div id="dashboard" class="page">
-
-    <div class="nav">
-        <button onclick="showSection('posts')">Posts</button>
-        <button onclick="showSection('messages')">Chat</button>
-        <button onclick="showSection('meet')">Meet</button>
-        <button onclick="showSection('rules')">Rules</button>
-    </div>
-
-    <!-- POSTS -->
-    <div id="posts" class="section active">
-        <h2>🔥 Feed</h2>
-
-        <textarea id="postText"></textarea>
-        <input type="file" id="imageInput" accept="image/*">
-        <button onclick="addPost()">Post</button>
-
-        <div id="feed"></div>
-    </div>
-
-    <!-- CHAT -->
-    <div id="messages" class="section">
-        <h2>💬 Chat</h2>
-
-        <div id="chatBox"></div>
-
-        <input id="msgInput" placeholder="Message">
-        <button onclick="sendMessage()">Send</button>
-    </div>
-
-    <!-- MEET -->
-    <div id="meet" class="section">
-        <h2>🎥 Meet</h2>
-
-        <button onclick="findMatch()">Find Match</button>
-        <button onclick="startCamera()">Start Camera</button>
-
-        <p id="status">Not connected</p>
-
-        <video id="myVideo" autoplay muted playsinline></video>
-    </div>
-
-    <!-- RULES -->
-    <div id="rules" class="section">
-        <h2>📜 Rules</h2>
-        <p>No abuse, no nudity, respect students.</p>
-    </div>
-
-</div>
-
-<script>
-
-const API = "https://africauni-backend1-1.onrender.com";
-
-let username = "";
-let socket = io(API);
-
-/* NAVIGATION */
-function goLogin(){
-    switchPage("login");
-}
-
-function login(){
-    username = document.getElementById("username").value;
-    if(!username) return alert("Enter username");
-    switchPage("dashboard");
-}
-
-function switchPage(page){
-    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-    document.getElementById(page).classList.add("active");
-}
-
-function showSection(section){
-    document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-    document.getElementById(section).classList.add("active");
-}
-
-/* POSTS */
-function addPost(){
-    const text = document.getElementById("postText").value;
-    const image = document.getElementById("imageInput").files[0];
-
-    const div = document.createElement("div");
-    div.className = "card";
-
-    if(image){
-        div.innerHTML =
-        "<b>"+username+"</b><br>"+text+
-        "<br><img src='"+URL.createObjectURL(image)+"' style='width:100%'>";
-    }else{
-        div.innerHTML = "<b>"+username+"</b><br>"+text;
-    }
-
-    document.getElementById("feed").prepend(div);
-}
-
-/* CHAT */
-socket.emit("joinChat","africauni-room");
-
-socket.on("newMessage",(data)=>{
-    const div = document.createElement("div");
-    div.className="card";
-    div.innerHTML="<b>"+data.user+":</b> "+data.message;
-    document.getElementById("chatBox").appendChild(div);
-});
-
-function sendMessage(){
-    const msg = document.getElementById("msgInput").value;
-
-    socket.emit("sendMessage",{
-        roomId:"africauni-room",
-        user:username,
-        message:msg
-    });
-
-    document.getElementById("msgInput").value="";
-}
-
-/* MEET */
-function findMatch(){
-    socket.emit("findMatch");
-}
-
-socket.on("status",(m)=>{
-    document.getElementById("status").innerText=m;
-});
-
-socket.on("matched",()=>{
-    document.getElementById("status").innerText="Connected 🎉";
-});
-
-/* CAMERA */
-async function startCamera(){
-    try{
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video:true,
-            audio:true
-        });
-
-        document.getElementById("myVideo").srcObject = stream;
-
-    }catch(e){
-        alert("Camera not allowed");
-    }
-}
+navigator.mediaDevices.getUserMedia({video:true,audio:true})
+.then(s=>cam.srcObject=s);
 
 </script>
 
