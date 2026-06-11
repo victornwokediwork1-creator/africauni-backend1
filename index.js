@@ -4,7 +4,6 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -14,115 +13,175 @@ app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
 const io = new Server(server, {
-    cors: { origin: "*" }
+  cors: { origin: "*" }
 });
 
-let users = {};
-let posts = [];
-let messages = [];
-let waitingUser = null;
+/* =========================
+   DATABASE (TEMP MEMORY)
+========================= */
 
-if (!fs.existsSync("uploads")) {
-    fs.mkdirSync("uploads");
-}
+let users = {};        // profiles
+let posts = [];
+let waitingUser = null;
+let activePairs = {};
+
+/* =========================
+   IMAGE UPLOAD
+========================= */
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, "uploads/"),
-    filename: (req, file, cb) =>
-        cb(null, Date.now() + path.extname(file.originalname))
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + path.extname(file.originalname))
 });
 
 const upload = multer({ storage });
 
+/* =========================
+   ROUTES
+========================= */
+
 app.get("/", (req, res) => {
-    res.json({ status: "AfricaUni backend running 🚀" });
+  res.json({ status: "AfricaUni backend running 🚀" });
 });
 
-/* LOGIN */
+/* LOGIN + PROFILE CREATION */
 app.post("/login", (req, res) => {
-    const { username } = req.body;
+  const { username } = req.body;
 
-    if (!username) {
-        return res.status(400).json({ error: "Username required" });
-    }
+  if (!username)
+    return res.status(400).json({ error: "Username required" });
 
-    if (!users[username]) {
-        users[username] = { username };
-    }
+  if (!users[username]) {
+    users[username] = {
+      username,
+      followers: [],
+      following: []
+    };
+  }
 
-    res.json(users[username]);
+  res.json(users[username]);
+});
+
+/* GET PROFILE */
+app.get("/profile/:username", (req, res) => {
+  const user = users[req.params.username];
+  if (!user) return res.status(404).json({ error: "Not found" });
+  res.json(user);
+});
+
+/* FOLLOW */
+app.post("/follow", (req, res) => {
+  const { user, target } = req.body;
+
+  if (!users[user] || !users[target])
+    return res.status(404).json({ error: "User not found" });
+
+  if (!users[user].following.includes(target))
+    users[user].following.push(target);
+
+  if (!users[target].followers.includes(user))
+    users[target].followers.push(user);
+
+  res.json({ success: true });
+});
+
+/* UNFOLLOW */
+app.post("/unfollow", (req, res) => {
+  const { user, target } = req.body;
+
+  users[user].following =
+    users[user].following.filter(u => u !== target);
+
+  users[target].followers =
+    users[target].followers.filter(u => u !== user);
+
+  res.json({ success: true });
 });
 
 /* POSTS */
 app.post("/post", upload.single("image"), (req, res) => {
-    const { username, text } = req.body;
+  const { username, text } = req.body;
 
-    let image = null;
-    if (req.file) {
-        image = "/uploads/" + req.file.filename;
-    }
+  let image = null;
+  if (req.file) image = "/uploads/" + req.file.filename;
 
-    const post = {
-        id: Date.now(),
-        username,
-        text,
-        image
-    };
+  const post = {
+    id: Date.now(),
+    username,
+    text,
+    image
+  };
 
-    posts.unshift(post);
-    io.emit("newPost", post);
+  posts.unshift(post);
+  io.emit("newPost", post);
 
-    res.json(post);
+  res.json(post);
 });
 
-app.get("/posts", (req, res) => {
-    res.json(posts);
-});
+app.get("/posts", (req, res) => res.json(posts));
 
-/* CHAT HISTORY */
-app.get("/messages", (req, res) => {
-    res.json(messages);
-});
+/* =========================
+   SOCKET.IO
+========================= */
 
-/* SOCKET */
 io.on("connection", (socket) => {
 
-    socket.on("joinChat", (room) => {
-        socket.join(room);
-    });
+  console.log("User connected:", socket.id);
 
-    socket.on("sendMessage", (data) => {
+  /* OMEGLE MATCH */
+  socket.on("findMatch", () => {
+    if (!waitingUser) {
+      waitingUser = socket;
+      socket.emit("status", "Searching...");
+    } else {
+      const partner = waitingUser;
+      waitingUser = null;
 
-        const msg = {
-            user: data.user,
-            message: data.message,
-            room: data.room,
-            time: Date.now()
-        };
+      activePairs[socket.id] = partner.id;
+      activePairs[partner.id] = socket.id;
 
-        messages.push(msg);
+      socket.emit("matched");
+      partner.emit("matched");
+    }
+  });
 
-        io.to(data.room).emit("newMessage", msg);
-    });
+  /* CHAT SYSTEM */
+  socket.on("joinChat", (roomId) => {
+    socket.join(roomId);
+  });
 
-    socket.on("findMatch", () => {
-        if (!waitingUser) {
-            waitingUser = socket;
-            socket.emit("status", "Searching...");
-        } else {
-            waitingUser.emit("matched");
-            socket.emit("matched");
-            waitingUser = null;
-        }
-    });
+  socket.on("sendMessage", ({ roomId, user, message }) => {
+    io.to(roomId).emit("newMessage", { user, message });
+  });
 
-    socket.on("disconnect", () => {
-        if (waitingUser === socket) {
-            waitingUser = null;
-        }
-    });
+  /* PRIVATE DM */
+  socket.on("privateMessage", ({ from, to, message }) => {
+    const room = [from, to].sort().join("-");
+    io.to(room).emit("newPrivateMessage", { from, message });
+  });
+
+  socket.on("joinPrivateChat", ({ user1, user2 }) => {
+    const room = [user1, user2].sort().join("-");
+    socket.join(room);
+  });
+
+  /* DISCONNECT */
+  socket.on("disconnect", () => {
+    if (waitingUser?.id === socket.id) waitingUser = null;
+
+    const partnerId = activePairs[socket.id];
+
+    if (partnerId) {
+      io.to(partnerId).emit("partnerLeft");
+      delete activePairs[partnerId];
+    }
+
+    delete activePairs[socket.id];
+  });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Server running", PORT));
-
+server.listen(PORT, () =>
+  console.log("AfricaUni running on", PORT)
+);
