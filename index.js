@@ -17,17 +17,15 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-/* ================= SAFE MEMORY ================= */
 let users = {};
 let posts = [];
+let messages = [];
 let waitingUser = null;
 
-/* ================= CREATE UPLOAD FOLDER ================= */
 if (!fs.existsSync("uploads")) {
     fs.mkdirSync("uploads");
 }
 
-/* ================= IMAGE UPLOAD ================= */
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, "uploads/"),
     filename: (req, file, cb) =>
@@ -35,8 +33,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
-/* ================= ROUTES ================= */
 
 app.get("/", (req, res) => {
     res.json({ status: "AfricaUni backend running 🚀" });
@@ -51,11 +47,7 @@ app.post("/login", (req, res) => {
     }
 
     if (!users[username]) {
-        users[username] = {
-            username,
-            followers: [],
-            following: []
-        };
+        users[username] = { username };
     }
 
     res.json(users[username]);
@@ -64,10 +56,6 @@ app.post("/login", (req, res) => {
 /* POSTS */
 app.post("/post", upload.single("image"), (req, res) => {
     const { username, text } = req.body;
-
-    if (!username) {
-        return res.status(400).json({ error: "Missing username" });
-    }
 
     let image = null;
     if (req.file) {
@@ -82,7 +70,6 @@ app.post("/post", upload.single("image"), (req, res) => {
     };
 
     posts.unshift(post);
-
     io.emit("newPost", post);
 
     res.json(post);
@@ -92,40 +79,43 @@ app.get("/posts", (req, res) => {
     res.json(posts);
 });
 
-/* ================= SOCKET ================= */
+/* CHAT HISTORY */
+app.get("/messages", (req, res) => {
+    res.json(messages);
+});
 
+/* SOCKET */
 io.on("connection", (socket) => {
 
-    console.log("User connected:", socket.id);
-
-    /* CHAT ROOM */
     socket.on("joinChat", (room) => {
         socket.join(room);
     });
 
     socket.on("sendMessage", (data) => {
-        io.to(data.room).emit("newMessage", {
+
+        const msg = {
             user: data.user,
-            message: data.message
-        });
+            message: data.message,
+            room: data.room,
+            time: Date.now()
+        };
+
+        messages.push(msg);
+
+        io.to(data.room).emit("newMessage", msg);
     });
 
-    /* MEET SYSTEM */
     socket.on("findMatch", () => {
-
         if (!waitingUser) {
             waitingUser = socket;
             socket.emit("status", "Searching...");
         } else {
-            const partner = waitingUser;
-            waitingUser = null;
-
+            waitingUser.emit("matched");
             socket.emit("matched");
-            partner.emit("matched");
+            waitingUser = null;
         }
     });
 
-    /* CLEAN DISCONNECT */
     socket.on("disconnect", () => {
         if (waitingUser === socket) {
             waitingUser = null;
@@ -134,7 +124,5 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log("Server running", PORT));
 
-server.listen(PORT, () => {
-    console.log("Server running on port", PORT);
-});
