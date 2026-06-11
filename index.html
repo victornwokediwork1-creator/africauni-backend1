@@ -1,270 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AfricaUni</title>
-
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#eef2f5;}
-.page{display:none;padding:20px;}
-.page.active{display:block;}
-
-#welcome{
-    height:100vh;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    background:linear-gradient(135deg,#1e90ff,#00c6ff);
-    color:white;
-}
-
-button{
-    padding:10px;
-    margin:5px;
-    border:none;
-    border-radius:8px;
-    background:#1e90ff;
-    color:white;
-}
-
-input,textarea{
-    width:100%;
-    padding:10px;
-    margin:5px 0;
-}
-
-.nav{
-    display:flex;
-    justify-content:space-around;
-    background:#1e90ff;
-}
-
-.nav button{
-    background:white;
-    color:#1e90ff;
-    font-weight:bold;
-}
-
-.section{display:none;}
-.section.active{display:block;}
-
-.card{
-    background:white;
-    padding:10px;
-    margin:10px 0;
-    border-radius:10px;
-}
-
-video{
-    width:100%;
-    border-radius:10px;
-}
+body{margin:0;font-family:Arial;background:#eef2f5}
+.page{display:none;padding:20px}
+.page.active{display:block}
+#welcome{height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#1e90ff;color:white}
+button{padding:10px;margin:5px;border:none;border-radius:8px;background:#1e90ff;color:white}
+input,textarea{width:100%;padding:10px;margin:5px 0}
+.card{background:white;padding:10px;margin:10px 0;border-radius:10px}
+.nav{display:flex;justify-content:space-around;background:#1e90ff}
+.nav button{background:white;color:#1e90ff}
+.section{display:none}
+.section.active{display:block}
+video{width:100%;border-radius:10px}
 </style>
 </head>
 
 <body>
 
-<!-- WELCOME -->
 <div id="welcome" class="page active">
-    <h1>AfricaUni</h1>
-    <p>Connect • Learn • Share</p>
-    <button onclick="goLogin()">Start</button>
+<h2>AfricaUni</h2>
+<button onclick="goLogin()">Start</button>
 </div>
 
-<!-- LOGIN -->
 <div id="login" class="page">
-    <h2>Login</h2>
-    <input id="username" placeholder="Enter username">
-    <button onclick="login()">Enter</button>
+<input id="username" placeholder="Username">
+<button onclick="login()">Enter</button>
 </div>
 
-<!-- DASHBOARD -->
 <div id="dashboard" class="page">
 
-    <div class="nav">
-        <button onclick="show('posts')">Posts</button>
-        <button onclick="show('chat')">Chat</button>
-        <button onclick="show('meet')">Meet</button>
-    </div>
+<div class="nav">
+<button onclick="show('posts')">Posts</button>
+<button onclick="show('chat')">Chat</button>
+<button onclick="show('meet')">Meet</button>
+</div>
 
-    <!-- POSTS -->
-    <div id="posts" class="section active">
-        <textarea id="postText"></textarea>
-        <input type="file" id="imageInput">
-        <button onclick="addPost()">Post</button>
+<div id="posts" class="section active">
+<textarea id="postText"></textarea>
+<input type="file" id="imageInput">
+<button onclick="addPost()">Post</button>
+<div id="feed"></div>
+</div>
 
-        <div id="feed"></div>
-    </div>
+<div id="chat" class="section">
+<div id="chatBox"></div>
+<input id="msg">
+<button onclick="send()">Send</button>
+</div>
 
-    <!-- CHAT -->
-    <div id="chat" class="section">
-        <div id="chatBox"></div>
-
-        <input id="msg" placeholder="Message">
-        <button onclick="send()">Send</button>
-    </div>
-
-    <!-- MEET -->
-    <div id="meet" class="section">
-        <button onclick="findMatch()">Find Match</button>
-        <p id="status">Not connected</p>
-        <video id="cam" autoplay muted></video>
-    </div>
+<div id="meet" class="section">
+<button onclick="findMatch()">Find Match</button>
+<p id="status"></p>
+<video id="cam" autoplay muted></video>
+</div>
 
 </div>
 
 <script>
 
-const API = "https://africauni-backend1-1.onrender.com";
-
-let socket = io(API);
-let username = "";
+const API="https://africauni-backend1-1.onrender.com";
+let socket=io(API);
+let username="";
 
 /* NAV */
-function goLogin(){
-    switchPage("login");
-}
-
-function switchPage(p){
-    document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
-    document.getElementById(p).classList.add("active");
-}
-
-function show(s){
-    document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
-    document.getElementById(s).classList.add("active");
-}
+function goLogin(){switchPage("login")}
+function switchPage(p){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(p).classList.add("active")}
+function show(s){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));document.getElementById(s).classList.add("active")}
 
 /* LOGIN */
 function login(){
-    username = document.getElementById("username").value;
-    if(!username) return alert("Enter username");
-
-    fetch(API+"/login",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({username})
-    });
-
-    socket.emit("joinChat","room1"); // FIXED
-
-    switchPage("dashboard");
-    loadPosts();
-    loadChat();
+username=document.getElementById("username").value;
+switchPage("dashboard");
 }
 
 /* POSTS */
 function addPost(){
-    const text = document.getElementById("postText").value;
-    const image = document.getElementById("imageInput").files[0];
+const text=document.getElementById("postText").value;
+const img=document.getElementById("imageInput").files[0];
 
-    const form = new FormData();
-    form.append("username", username);
-    form.append("text", text);
-    if(image) form.append("image", image);
+const form=new FormData();
+form.append("username",username);
+form.append("text",text);
+if(img)form.append("image",img);
 
-    fetch(API+"/post", {
-        method:"POST",
-        body:form
-    })
-    .then(()=> loadPosts());
+fetch(API+"/post",{method:"POST",body:form});
 }
-
-function loadPosts(){
-    fetch(API+"/posts")
-    .then(res=>res.json())
-    .then(data=>{
-        const feed = document.getElementById("feed");
-        feed.innerHTML="";
-
-        data.forEach(p=>{
-            const div = document.createElement("div");
-            div.className="card";
-
-            let html = `<b>${p.username}</b><br>${p.text}`;
-            if(p.image){
-                html += `<br><img src="${API+p.image}" style="width:100%">`;
-            }
-
-            div.innerHTML = html;
-            feed.appendChild(div);
-        });
-    });
-}
-
-/* REAL TIME POSTS */
-socket.on("newPost",(post)=>{
-    const div = document.createElement("div");
-    div.className="card";
-
-    let html = `<b>${post.username}</b><br>${post.text}`;
-    if(post.image){
-        html += `<br><img src="${API+post.image}" style="width:100%">`;
-    }
-
-    div.innerHTML = html;
-    document.getElementById("feed").prepend(div);
-});
 
 /* CHAT */
-socket.on("newMessage",(data)=>{
-    const div = document.createElement("div");
-    div.className="card";
-    div.innerHTML = `<b>${data.user}</b>: ${data.message}`;
-    document.getElementById("chatBox").appendChild(div);
+socket.emit("joinChat","room1");
+
+socket.on("newMessage",d=>{
+let div=document.createElement("div");
+div.className="card";
+div.innerHTML="<b>"+d.user+"</b>: "+d.message;
+document.getElementById("chatBox").appendChild(div);
 });
 
 function send(){
-    const message = document.getElementById("msg").value;
-
-    socket.emit("sendMessage",{
-        room:"room1",
-        user:username,
-        message
-    });
-
-    document.getElementById("msg").value="";
-}
-
-/* LOAD CHAT */
-function loadChat(){
-    fetch(API+"/messages")
-    .then(res=>res.json())
-    .then(data=>{
-        const box = document.getElementById("chatBox");
-        box.innerHTML="";
-
-        data.forEach(m=>{
-            const div = document.createElement("div");
-            div.className="card";
-            div.innerHTML = `<b>${m.user}</b>: ${m.message}`;
-            box.appendChild(div);
-        });
-    });
+socket.emit("sendMessage",{roomId:"room1",user:username,message:msg.value});
+msg.value="";
 }
 
 /* MEET */
-function findMatch(){
-    socket.emit("findMatch");
-}
-
-socket.on("status",(m)=>{
-    document.getElementById("status").innerText = m;
-});
-
-socket.on("matched",()=>{
-    document.getElementById("status").innerText = "Connected 🎉";
-});
+function findMatch(){socket.emit("findMatch")}
+socket.on("status",m=>status.innerText=m);
+socket.on("matched",()=>status.innerText="Connected");
 
 /* CAMERA */
 navigator.mediaDevices.getUserMedia({video:true,audio:true})
-.then(stream=>{
-    document.getElementById("cam").srcObject = stream;
-});
+.then(s=>cam.srcObject=s);
 
 </script>
 
