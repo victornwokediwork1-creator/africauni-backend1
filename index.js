@@ -16,48 +16,29 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-/* =========================
-   MEMORY DATABASE
-========================= */
-
 let users = {};
 let posts = [];
-
 let waitingUser = null;
 
-/* =========================
-   IMAGE UPLOAD CONFIG
-========================= */
-
+/* ================= IMAGE UPLOAD ================= */
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/");
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
+    destination: (req, file, cb) => cb(null, "uploads/"),
+    filename: (req, file, cb) =>
+        cb(null, Date.now() + path.extname(file.originalname))
 });
-
 const upload = multer({ storage });
 
-/* =========================
-   BASIC ROUTE
-========================= */
+/* ================= ROUTES ================= */
 
 app.get("/", (req, res) => {
-    res.json({ message: "AfricaUni Backend Running 🚀" });
+    res.json({ status: "AfricaUni running" });
 });
 
-/* =========================
-   LOGIN / PROFILE CREATE
-========================= */
-
+/* LOGIN */
 app.post("/login", (req, res) => {
     const { username } = req.body;
 
-    if (!username) {
-        return res.status(400).json({ error: "Username required" });
-    }
+    if (!username) return res.status(400).json({ error: "No username" });
 
     if (!users[username]) {
         users[username] = {
@@ -70,66 +51,12 @@ app.post("/login", (req, res) => {
     res.json(users[username]);
 });
 
-/* =========================
-   FOLLOW SYSTEM
-========================= */
-
-app.post("/follow", (req, res) => {
-    const { user, target } = req.body;
-
-    if (!users[user] || !users[target]) {
-        return res.status(404).json({ error: "User not found" });
-    }
-
-    if (!users[user].following.includes(target)) {
-        users[user].following.push(target);
-    }
-
-    if (!users[target].followers.includes(user)) {
-        users[target].followers.push(user);
-    }
-
-    res.json({ success: true });
-});
-
-app.post("/unfollow", (req, res) => {
-    const { user, target } = req.body;
-
-    users[user].following =
-        users[user].following.filter(u => u !== target);
-
-    users[target].followers =
-        users[target].followers.filter(u => u !== user);
-
-    res.json({ success: true });
-});
-
-/* =========================
-   GET PROFILE
-========================= */
-
-app.get("/profile/:username", (req, res) => {
-    const user = users[req.params.username];
-
-    if (!user) {
-        return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json(user);
-});
-
-/* =========================
-   POSTS (REAL SHARED FEED)
-========================= */
-
+/* POSTS */
 app.post("/post", upload.single("image"), (req, res) => {
-
     const { username, text } = req.body;
 
     let image = null;
-    if (req.file) {
-        image = "/uploads/" + req.file.filename;
-    }
+    if (req.file) image = "/uploads/" + req.file.filename;
 
     const post = {
         id: Date.now(),
@@ -139,56 +66,34 @@ app.post("/post", upload.single("image"), (req, res) => {
     };
 
     posts.unshift(post);
-
-    // 🔥 SEND TO ALL USERS LIVE
     io.emit("newPost", post);
 
     res.json(post);
 });
 
-/* GET ALL POSTS */
 app.get("/posts", (req, res) => {
     res.json(posts);
 });
 
-/* =========================
-   SOCKET.IO SYSTEM
-========================= */
+/* ================= SOCKET ================= */
 
 io.on("connection", (socket) => {
 
-    console.log("User connected:", socket.id);
+    console.log("User connected");
 
-    /* JOIN USER */
-    socket.on("joinUser", (username) => {
-        socket.username = username;
-        socket.join(username);
+    /* CHAT ROOM */
+    socket.on("joinChat", (room) => {
+        socket.join(room);
     });
 
-    /* GROUP CHAT */
-    socket.on("joinChat", (roomId) => {
-        socket.join(roomId);
-    });
-
-    socket.on("sendMessage", ({ roomId, user, message }) => {
-        io.to(roomId).emit("newMessage", { user, message });
-    });
-
-    /* PRIVATE CHAT */
-    socket.on("privateMessage", ({ from, to, message }) => {
-
-        io.to(to).emit("newMessage", {
-            user: from,
-            message
-        });
-
-        io.to(from).emit("newMessage", {
-            user: from,
-            message
+    socket.on("sendMessage", (data) => {
+        io.to(data.room).emit("newMessage", {
+            user: data.user,
+            message: data.message
         });
     });
 
-    /* OMEGLE MATCH SYSTEM */
+    /* MEET SYSTEM */
     socket.on("findMatch", () => {
 
         if (!waitingUser) {
@@ -204,21 +109,10 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", () => {
-
-        if (waitingUser?.id === socket.id) {
-            waitingUser = null;
-        }
-
-        console.log("User disconnected:", socket.id);
+        if (waitingUser === socket) waitingUser = null;
     });
 });
 
-/* =========================
-   START SERVER
-========================= */
-
-const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-    console.log("AfricaUni running on port", PORT);
+server.listen(3000, () => {
+    console.log("Server running on 3000");
 });
