@@ -1,122 +1,247 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AfricaUni</title>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{margin:0;font-family:Arial;background:#eef2f5}
-.page{display:none;padding:20px}
-.page.active{display:block}
-#welcome{height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#1e90ff;color:white}
-button{padding:10px;margin:5px;border:none;border-radius:8px;background:#1e90ff;color:white}
-input,textarea{width:100%;padding:10px;margin:5px 0}
-.card{background:white;padding:10px;margin:10px 0;border-radius:10px}
-.nav{display:flex;justify-content:space-around;background:#1e90ff}
-.nav button{background:white;color:#1e90ff}
-.section{display:none}
-.section.active{display:block}
-video{width:100%;border-radius:10px}
+/* 🌍 GLOBAL STYLE */
+body{
+  margin:0;
+  font-family: "Segoe UI", sans-serif;
+  background:#0f172a;
+  color:#e2e8f0;
+}
+
+/* 🌈 HEADER */
+header{
+  background: linear-gradient(90deg,#1e3a8a,#2563eb,#06b6d4);
+  padding:20px;
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+  letter-spacing:1px;
+}
+
+/* 🧭 BUTTONS */
+button{
+  background:#2563eb;
+  border:none;
+  padding:10px 15px;
+  margin:5px;
+  border-radius:10px;
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+button:hover{
+  background:#1d4ed8;
+  transform:scale(1.05);
+}
+
+/* 📦 CONTAINER */
+.container{
+  padding:15px;
+}
+
+/* 🧱 BOX DESIGN */
+.box{
+  background:#111827;
+  padding:15px;
+  border-radius:15px;
+  margin-top:15px;
+  box-shadow:0 5px 15px rgba(0,0,0,0.4);
+}
+
+/* 🖼 POSTS */
+.post{
+  background:#1f2937;
+  padding:10px;
+  margin:10px 0;
+  border-radius:10px;
+}
+
+/* 💬 CHAT */
+#msgs{
+  height:200px;
+  overflow:auto;
+  background:#0b1220;
+  padding:10px;
+  border-radius:10px;
+  margin-top:10px;
+}
+
+/* 📷 VIDEO */
+video{
+  width:48%;
+  border-radius:10px;
+  margin:5px;
+  background:black;
+}
+
+/* 🚫 HIDE */
+.hidden{display:none;}
+
+/* 🌟 NAV BAR */
+.nav{
+  display:flex;
+  justify-content:space-around;
+  background:#1e293b;
+  padding:10px;
+  position:sticky;
+  top:0;
+}
 </style>
 </head>
 
 <body>
 
-<div id="welcome" class="page active">
-<h2>AfricaUni</h2>
-<button onclick="goLogin()">Start</button>
-</div>
+<header>🎓 AfricaUni - African University Network</header>
 
-<div id="login" class="page">
-<input id="username" placeholder="Username">
-<button onclick="login()">Enter</button>
-</div>
-
-<div id="dashboard" class="page">
-
+<!-- NAV -->
 <div class="nav">
-<button onclick="show('posts')">Posts</button>
-<button onclick="show('chat')">Chat</button>
-<button onclick="show('meet')">Meet</button>
+  <button onclick="show('post')">📢 Post</button>
+  <button onclick="show('chat')">💬 Chat</button>
+  <button onclick="show('meet')">📡 Meet</button>
 </div>
 
-<div id="posts" class="section active">
-<textarea id="postText"></textarea>
-<input type="file" id="imageInput">
-<button onclick="addPost()">Post</button>
-<div id="feed"></div>
+<div class="container">
+
+<!-- WELCOME -->
+<div id="welcome" class="box">
+  <h2>Welcome Student 👋</h2>
+  <p>Connect, chat, share and meet students across Africa.</p>
+  <button onclick="next()">Enter App</button>
 </div>
 
-<div id="chat" class="section">
-<div id="chatBox"></div>
-<input id="msg">
-<button onclick="send()">Send</button>
+<!-- POSTS -->
+<div id="post" class="box hidden">
+  <h3>📢 Campus Posts</h3>
+
+  <input id="text" placeholder="What's happening in campus?" style="width:100%;padding:10px;border-radius:8px;"><br><br>
+  <input type="file" id="img"><br><br>
+  <button onclick="upload()">Post</button>
+
+  <div id="posts"></div>
 </div>
 
-<div id="meet" class="section">
-<button onclick="findMatch()">Find Match</button>
-<p id="status"></p>
-<video id="cam" autoplay muted></video>
+<!-- CHAT -->
+<div id="chat" class="box hidden">
+  <h3>💬 Student Chat Room</h3>
+
+  <input id="room" placeholder="Enter room name" style="width:100%;padding:10px;border-radius:8px;">
+  <button onclick="join()">Join Room</button>
+
+  <div id="msgs"></div>
+
+  <input id="msg" placeholder="Type message" style="width:100%;padding:10px;border-radius:8px;">
+  <button onclick="send()">Send</button>
+</div>
+
+<!-- MEET -->
+<div id="meet" class="box hidden">
+  <h3>📡 Meet Students</h3>
+
+  <video id="cam" autoplay playsinline></video>
+
+  <br>
+
+  <button onclick="startCam()">Start Camera</button>
+  <button onclick="findMatch()">Find Match</button>
+  <button onclick="disconnectCam()">Disconnect</button>
+
+  <p id="status">Status: idle</p>
 </div>
 
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
-
-const API="https://africauni-backend1-1.onrender.com";
-let socket=io(API);
-let username="";
+const socket = io();
+let room = "";
+let stream;
 
 /* NAV */
-function goLogin(){switchPage("login")}
-function switchPage(p){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(p).classList.add("active")}
-function show(s){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));document.getElementById(s).classList.add("active")}
-
-/* LOGIN */
-function login(){
-username=document.getElementById("username").value;
-switchPage("dashboard");
+function next(){
+  document.getElementById("welcome").classList.add("hidden");
 }
 
-/* POSTS */
-function addPost(){
-const text=document.getElementById("postText").value;
-const img=document.getElementById("imageInput").files[0];
+function show(id){
+  document.getElementById("post").classList.add("hidden");
+  document.getElementById("chat").classList.add("hidden");
+  document.getElementById("meet").classList.add("hidden");
 
-const form=new FormData();
-form.append("username",username);
-form.append("text",text);
-if(img)form.append("image",img);
-
-fetch(API+"/post",{method:"POST",body:form});
+  document.getElementById(id).classList.remove("hidden");
 }
 
-/* CHAT */
-socket.emit("joinChat","room1");
+/* ---------------- POSTS ---------------- */
+async function upload(){
+  const text = document.getElementById("text").value;
+  const img = document.getElementById("img").files[0];
 
-socket.on("newMessage",d=>{
-let div=document.createElement("div");
-div.className="card";
-div.innerHTML="<b>"+d.user+"</b>: "+d.message;
-document.getElementById("chatBox").appendChild(div);
+  const form = new FormData();
+  form.append("text", text);
+  form.append("image", img);
+
+  await fetch("/post", { method:"POST", body:form });
+  loadPosts();
+}
+
+async function loadPosts(){
+  const res = await fetch("/posts");
+  const data = await res.json();
+
+  document.getElementById("posts").innerHTML =
+    data.map(p => `
+      <div class="post">
+        <p>${p.text}</p>
+        ${p.image ? `<img src="${p.image}" width="100%">` : ""}
+      </div>
+    `).join("");
+}
+loadPosts();
+
+/* ---------------- CHAT ---------------- */
+function join(){
+  room = document.getElementById("room").value;
+  socket.emit("join", room);
+}
+
+socket.on("history", (msgs)=>{
+  document.getElementById("msgs").innerHTML =
+    msgs.map(m => `<p>🟢 ${m.msg}</p>`).join("");
+});
+
+socket.on("new", (data)=>{
+  document.getElementById("msgs").innerHTML += `<p>🟢 ${data.msg}</p>`;
 });
 
 function send(){
-socket.emit("sendMessage",{roomId:"room1",user:username,message:msg.value});
-msg.value="";
+  const msg = document.getElementById("msg").value;
+  socket.emit("msg", { room, msg });
 }
 
-/* MEET */
-function findMatch(){socket.emit("findMatch")}
-socket.on("status",m=>status.innerText=m);
-socket.on("matched",()=>status.innerText="Connected");
+/* ---------------- MEET ---------------- */
+async function startCam(){
+  stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+  document.getElementById("cam").srcObject = stream;
+  document.getElementById("status").innerText = "📷 Camera Active";
+}
 
-/* CAMERA */
-navigator.mediaDevices.getUserMedia({video:true,audio:true})
-.then(s=>cam.srcObject=s);
+function findMatch(){
+  document.getElementById("status").innerText =
+    "🔍 Searching students... (demo mode)";
+}
 
+function disconnectCam(){
+  if(stream){
+    stream.getTracks().forEach(t => t.stop());
+  }
+  document.getElementById("cam").srcObject = null;
+  document.getElementById("status").innerText = "❌ Disconnected";
+}
 </script>
 
 </body>
