@@ -4,6 +4,7 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -16,9 +17,15 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
+/* ================= SAFE MEMORY ================= */
 let users = {};
 let posts = [];
 let waitingUser = null;
+
+/* ================= CREATE UPLOAD FOLDER ================= */
+if (!fs.existsSync("uploads")) {
+    fs.mkdirSync("uploads");
+}
 
 /* ================= IMAGE UPLOAD ================= */
 const storage = multer.diskStorage({
@@ -26,19 +33,22 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) =>
         cb(null, Date.now() + path.extname(file.originalname))
 });
+
 const upload = multer({ storage });
 
 /* ================= ROUTES ================= */
 
 app.get("/", (req, res) => {
-    res.json({ status: "AfricaUni running" });
+    res.json({ status: "AfricaUni backend running 🚀" });
 });
 
 /* LOGIN */
 app.post("/login", (req, res) => {
     const { username } = req.body;
 
-    if (!username) return res.status(400).json({ error: "No username" });
+    if (!username) {
+        return res.status(400).json({ error: "Username required" });
+    }
 
     if (!users[username]) {
         users[username] = {
@@ -55,8 +65,14 @@ app.post("/login", (req, res) => {
 app.post("/post", upload.single("image"), (req, res) => {
     const { username, text } = req.body;
 
+    if (!username) {
+        return res.status(400).json({ error: "Missing username" });
+    }
+
     let image = null;
-    if (req.file) image = "/uploads/" + req.file.filename;
+    if (req.file) {
+        image = "/uploads/" + req.file.filename;
+    }
 
     const post = {
         id: Date.now(),
@@ -66,6 +82,7 @@ app.post("/post", upload.single("image"), (req, res) => {
     };
 
     posts.unshift(post);
+
     io.emit("newPost", post);
 
     res.json(post);
@@ -79,7 +96,7 @@ app.get("/posts", (req, res) => {
 
 io.on("connection", (socket) => {
 
-    console.log("User connected");
+    console.log("User connected:", socket.id);
 
     /* CHAT ROOM */
     socket.on("joinChat", (room) => {
@@ -108,11 +125,16 @@ io.on("connection", (socket) => {
         }
     });
 
+    /* CLEAN DISCONNECT */
     socket.on("disconnect", () => {
-        if (waitingUser === socket) waitingUser = null;
+        if (waitingUser === socket) {
+            waitingUser = null;
+        }
     });
 });
 
-server.listen(3000, () => {
-    console.log("Server running on 3000");
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+    console.log("Server running on port", PORT);
 });
