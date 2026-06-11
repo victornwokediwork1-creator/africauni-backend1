@@ -13,31 +13,26 @@ app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
 const io = new Server(server, {
-  cors: {
-    origin: "*"
-  }
+  cors: { origin: "*" }
 });
 
 /* =========================
-   STORAGE (TEMP DATABASE)
+   DATABASE (TEMP MEMORY)
 ========================= */
 
-let users = [];
+let users = {};        // profiles
 let posts = [];
 let waitingUser = null;
 let activePairs = {};
 
 /* =========================
-   IMAGE UPLOAD CONFIG
+   IMAGE UPLOAD
 ========================= */
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + path.extname(file.originalname))
 });
 
 const upload = multer({ storage });
@@ -47,56 +42,84 @@ const upload = multer({ storage });
 ========================= */
 
 app.get("/", (req, res) => {
-  res.json({
-    app: "AfricaUni Backend",
-    status: "Live 🚀"
-  });
+  res.json({ status: "AfricaUni backend running 🚀" });
 });
 
-/* LOGIN */
+/* LOGIN + PROFILE CREATION */
 app.post("/login", (req, res) => {
   const { username } = req.body;
 
-  if (!username) return res.status(400).json({ error: "Username required" });
+  if (!username)
+    return res.status(400).json({ error: "Username required" });
 
-  let user = users.find(u => u.username === username);
-
-  if (!user) {
-    user = { id: Date.now(), username };
-    users.push(user);
+  if (!users[username]) {
+    users[username] = {
+      username,
+      followers: [],
+      following: []
+    };
   }
 
-  res.json({ success: true, user });
+  res.json(users[username]);
 });
 
-/* POSTS (TEXT + IMAGE) */
+/* GET PROFILE */
+app.get("/profile/:username", (req, res) => {
+  const user = users[req.params.username];
+  if (!user) return res.status(404).json({ error: "Not found" });
+  res.json(user);
+});
+
+/* FOLLOW */
+app.post("/follow", (req, res) => {
+  const { user, target } = req.body;
+
+  if (!users[user] || !users[target])
+    return res.status(404).json({ error: "User not found" });
+
+  if (!users[user].following.includes(target))
+    users[user].following.push(target);
+
+  if (!users[target].followers.includes(user))
+    users[target].followers.push(user);
+
+  res.json({ success: true });
+});
+
+/* UNFOLLOW */
+app.post("/unfollow", (req, res) => {
+  const { user, target } = req.body;
+
+  users[user].following =
+    users[user].following.filter(u => u !== target);
+
+  users[target].followers =
+    users[target].followers.filter(u => u !== user);
+
+  res.json({ success: true });
+});
+
+/* POSTS */
 app.post("/post", upload.single("image"), (req, res) => {
   const { username, text } = req.body;
 
-  let imageUrl = null;
-
-  if (req.file) {
-    imageUrl = `/uploads/${req.file.filename}`;
-  }
+  let image = null;
+  if (req.file) image = "/uploads/" + req.file.filename;
 
   const post = {
     id: Date.now(),
     username,
     text,
-    image: imageUrl,
-    createdAt: new Date()
+    image
   };
 
   posts.unshift(post);
-
   io.emit("newPost", post);
 
-  res.json({ success: true, post });
+  res.json(post);
 });
 
-app.get("/posts", (req, res) => {
-  res.json(posts);
-});
+app.get("/posts", (req, res) => res.json(posts));
 
 /* =========================
    SOCKET.IO
@@ -106,15 +129,11 @@ io.on("connection", (socket) => {
 
   console.log("User connected:", socket.id);
 
-  /* =========================
-     OMEGLE STYLE MEET
-  ========================= */
-
+  /* OMEGLE MATCH */
   socket.on("findMatch", () => {
-
     if (!waitingUser) {
       waitingUser = socket;
-      socket.emit("status", "Waiting for student...");
+      socket.emit("status", "Searching...");
     } else {
       const partner = waitingUser;
       waitingUser = null;
@@ -127,41 +146,29 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("message", (data) => {
-    const partnerId = activePairs[socket.id];
-
-    if (partnerId) {
-      io.to(partnerId).emit("message", {
-        from: socket.id,
-        text: data.text
-      });
-    }
-  });
-
-  /* =========================
-     WHATSAPP CHAT SYSTEM
-  ========================= */
-
+  /* CHAT SYSTEM */
   socket.on("joinChat", (roomId) => {
     socket.join(roomId);
   });
 
-  socket.on("sendMessage", ({ roomId, message, user }) => {
-    io.to(roomId).emit("newMessage", {
-      user,
-      message
-    });
+  socket.on("sendMessage", ({ roomId, user, message }) => {
+    io.to(roomId).emit("newMessage", { user, message });
   });
 
-  /* =========================
-     DISCONNECT
-  ========================= */
+  /* PRIVATE DM */
+  socket.on("privateMessage", ({ from, to, message }) => {
+    const room = [from, to].sort().join("-");
+    io.to(room).emit("newPrivateMessage", { from, message });
+  });
 
+  socket.on("joinPrivateChat", ({ user1, user2 }) => {
+    const room = [user1, user2].sort().join("-");
+    socket.join(room);
+  });
+
+  /* DISCONNECT */
   socket.on("disconnect", () => {
-
-    if (waitingUser && waitingUser.id === socket.id) {
-      waitingUser = null;
-    }
+    if (waitingUser?.id === socket.id) waitingUser = null;
 
     const partnerId = activePairs[socket.id];
 
@@ -171,18 +178,10 @@ io.on("connection", (socket) => {
     }
 
     delete activePairs[socket.id];
-
-    console.log("User disconnected:", socket.id);
   });
-
 });
-
-/* =========================
-   START SERVER
-========================= */
 
 const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-  console.log("AfricaUni running on port", PORT);
-});
+server.listen(PORT, () =>
+  console.log("AfricaUni running on", PORT)
+);
