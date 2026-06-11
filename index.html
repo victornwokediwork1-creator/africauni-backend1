@@ -5,167 +5,122 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-/* 🌍 GLOBAL STYLE */
-body{
-  margin:0;
-  font-family: "Segoe UI", sans-serif;
-  background:#0f172a;
-  color:#e2e8f0;
-}
+body{margin:0;font-family:Arial;background:#0f172a;color:white;text-align:center}
+.hidden{display:none}
 
-/* 🌈 HEADER */
-header{
-  background: linear-gradient(90deg,#1e3a8a,#2563eb,#06b6d4);
-  padding:20px;
-  text-align:center;
-  font-size:22px;
-  font-weight:bold;
-  letter-spacing:1px;
-}
-
-/* 🧭 BUTTONS */
 button{
-  background:#2563eb;
+  padding:10px;
+  margin:5px;
   border:none;
-  padding:10px 15px;
-  margin:5px;
-  border-radius:10px;
+  border-radius:8px;
+  background:#2563eb;
   color:white;
-  font-weight:600;
-  cursor:pointer;
-  transition:0.2s;
 }
 
-button:hover{
-  background:#1d4ed8;
-  transform:scale(1.05);
-}
-
-/* 📦 CONTAINER */
-.container{
-  padding:15px;
-}
-
-/* 🧱 BOX DESIGN */
-.box{
-  background:#111827;
-  padding:15px;
-  border-radius:15px;
-  margin-top:15px;
-  box-shadow:0 5px 15px rgba(0,0,0,0.4);
-}
-
-/* 🖼 POSTS */
-.post{
-  background:#1f2937;
+input{
   padding:10px;
-  margin:10px 0;
-  border-radius:10px;
-}
-
-/* 💬 CHAT */
-#msgs{
-  height:200px;
-  overflow:auto;
-  background:#0b1220;
-  padding:10px;
-  border-radius:10px;
-  margin-top:10px;
-}
-
-/* 📷 VIDEO */
-video{
-  width:48%;
-  border-radius:10px;
   margin:5px;
-  background:black;
+  width:80%;
 }
 
-/* 🚫 HIDE */
-.hidden{display:none;}
+.box{padding:15px}
 
-/* 🌟 NAV BAR */
-.nav{
-  display:flex;
-  justify-content:space-around;
-  background:#1e293b;
-  padding:10px;
-  position:sticky;
-  top:0;
+video{
+  width:90%;
+  max-width:400px;
+  border-radius:10px;
+  background:black;
 }
 </style>
 </head>
 
 <body>
 
-<header>🎓 AfricaUni - African University Network</header>
+<!-- ================= WELCOME ================= -->
+<div id="welcome">
+  <h1>🎓 AfricaUni</h1>
+  <p>Welcome to African University Network</p>
+  <button onclick="goLogin()">Next</button>
+</div>
 
-<!-- NAV -->
-<div class="nav">
+<!-- ================= LOGIN ================= -->
+<div id="login" class="hidden">
+  <h2>Login</h2>
+  <input id="name" placeholder="Enter your name">
+  <button onclick="enterApp()">Login</button>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app" class="hidden">
+
+  <h2>Welcome, <span id="user"></span></h2>
+
   <button onclick="show('post')">📢 Post</button>
   <button onclick="show('chat')">💬 Chat</button>
   <button onclick="show('meet')">📡 Meet</button>
-</div>
 
-<div class="container">
+  <!-- POSTS -->
+  <div id="post" class="box">
+    <h3>Posts</h3>
 
-<!-- WELCOME -->
-<div id="welcome" class="box">
-  <h2>Welcome Student 👋</h2>
-  <p>Connect, chat, share and meet students across Africa.</p>
-  <button onclick="next()">Enter App</button>
-</div>
+    <input id="text" placeholder="Write post"><br>
+    <input type="file" id="img"><br>
+    <button onclick="upload()">Post</button>
 
-<!-- POSTS -->
-<div id="post" class="box hidden">
-  <h3>📢 Campus Posts</h3>
+    <div id="posts"></div>
+  </div>
 
-  <input id="text" placeholder="What's happening in campus?" style="width:100%;padding:10px;border-radius:8px;"><br><br>
-  <input type="file" id="img"><br><br>
-  <button onclick="upload()">Post</button>
+  <!-- CHAT -->
+  <div id="chat" class="box hidden">
+    <h3>Chat Room</h3>
 
-  <div id="posts"></div>
-</div>
+    <input id="room" placeholder="Room name">
+    <button onclick="join()">Join</button>
 
-<!-- CHAT -->
-<div id="chat" class="box hidden">
-  <h3>💬 Student Chat Room</h3>
+    <div id="msgs"></div>
 
-  <input id="room" placeholder="Enter room name" style="width:100%;padding:10px;border-radius:8px;">
-  <button onclick="join()">Join Room</button>
+    <input id="msg" placeholder="Message">
+    <button onclick="send()">Send</button>
+  </div>
 
-  <div id="msgs"></div>
+  <!-- MEET -->
+  <div id="meet" class="box hidden">
+    <h3>Meet</h3>
 
-  <input id="msg" placeholder="Type message" style="width:100%;padding:10px;border-radius:8px;">
-  <button onclick="send()">Send</button>
-</div>
+    <video id="cam" autoplay playsinline></video>
 
-<!-- MEET -->
-<div id="meet" class="box hidden">
-  <h3>📡 Meet Students</h3>
+    <br>
 
-  <video id="cam" autoplay playsinline></video>
+    <button onclick="startCam()">Start Camera</button>
+    <button onclick="findMatch()">Find Match</button>
+    <button onclick="disconnectCam()">Disconnect</button>
 
-  <br>
-
-  <button onclick="startCam()">Start Camera</button>
-  <button onclick="findMatch()">Find Match</button>
-  <button onclick="disconnectCam()">Disconnect</button>
-
-  <p id="status">Status: idle</p>
-</div>
+    <p id="status">Idle</p>
+  </div>
 
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+
 <script>
 const socket = io();
-let room = "";
+let room="";
 let stream;
 
-/* NAV */
-function next(){
+/* ========== NAV ========== */
+function goLogin(){
   document.getElementById("welcome").classList.add("hidden");
+  document.getElementById("login").classList.remove("hidden");
+}
+
+function enterApp(){
+  const name = document.getElementById("name").value;
+  if(!name) return alert("Enter name");
+
+  document.getElementById("user").innerText = name;
+
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
 }
 
 function show(id){
@@ -176,17 +131,26 @@ function show(id){
   document.getElementById(id).classList.remove("hidden");
 }
 
-/* ---------------- POSTS ---------------- */
+/* ========== POSTS FIXED ========== */
 async function upload(){
-  const text = document.getElementById("text").value;
-  const img = document.getElementById("img").files[0];
+  const text=document.getElementById("text").value;
+  const img=document.getElementById("img").files[0];
 
-  const form = new FormData();
-  form.append("text", text);
-  form.append("image", img);
+  const form=new FormData();
+  form.append("text",text);
+  if(img) form.append("image",img);
 
-  await fetch("/post", { method:"POST", body:form });
-  loadPosts();
+  const res = await fetch("/post",{
+    method:"POST",
+    body:form
+  });
+
+  const data = await res.json();
+  if(data.success){
+    loadPosts();
+  } else {
+    alert("Post failed");
+  }
 }
 
 async function loadPosts(){
@@ -194,8 +158,8 @@ async function loadPosts(){
   const data = await res.json();
 
   document.getElementById("posts").innerHTML =
-    data.map(p => `
-      <div class="post">
+    data.map(p=>`
+      <div style="margin:10px;padding:10px;background:#1e293b;border-radius:10px">
         <p>${p.text}</p>
         ${p.image ? `<img src="${p.image}" width="100%">` : ""}
       </div>
@@ -203,44 +167,52 @@ async function loadPosts(){
 }
 loadPosts();
 
-/* ---------------- CHAT ---------------- */
+/* ========== CHAT ========== */
 function join(){
-  room = document.getElementById("room").value;
-  socket.emit("join", room);
+  room=document.getElementById("room").value;
+  socket.emit("join",room);
 }
 
-socket.on("history", (msgs)=>{
+socket.on("history",(msgs)=>{
   document.getElementById("msgs").innerHTML =
-    msgs.map(m => `<p>🟢 ${m.msg}</p>`).join("");
+    msgs.map(m=>`<p>${m.msg}</p>`).join("");
 });
 
-socket.on("new", (data)=>{
-  document.getElementById("msgs").innerHTML += `<p>🟢 ${data.msg}</p>`;
+socket.on("new",(d)=>{
+  document.getElementById("msgs").innerHTML += `<p>${d.msg}</p>`;
 });
 
 function send(){
-  const msg = document.getElementById("msg").value;
-  socket.emit("msg", { room, msg });
+  socket.emit("msg",{room,msg:document.getElementById("msg").value});
 }
 
-/* ---------------- MEET ---------------- */
+/* ========== MEET FIXED CAMERA ========== */
 async function startCam(){
-  stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
-  document.getElementById("cam").srcObject = stream;
-  document.getElementById("status").innerText = "📷 Camera Active";
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:true,
+      audio:true
+    });
+
+    document.getElementById("cam").srcObject = stream;
+    document.getElementById("status").innerText="Camera ON";
+  }
+  catch(err){
+    alert("Camera permission denied or not supported");
+  }
 }
 
 function findMatch(){
   document.getElementById("status").innerText =
-    "🔍 Searching students... (demo mode)";
+    "Searching (demo mode)";
 }
 
 function disconnectCam(){
   if(stream){
-    stream.getTracks().forEach(t => t.stop());
+    stream.getTracks().forEach(t=>t.stop());
   }
-  document.getElementById("cam").srcObject = null;
-  document.getElementById("status").innerText = "❌ Disconnected";
+  document.getElementById("cam").srcObject=null;
+  document.getElementById("status").innerText="Disconnected";
 }
 </script>
 
